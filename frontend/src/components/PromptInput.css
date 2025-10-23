@@ -1,0 +1,142 @@
+.prompt-input-container {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-md);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.input-header label {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.character-counter {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.character-counter.over-limit {
+  color: var(--error-color);
+  font-weight: 500;
+}
+
+textarea#prompt-text {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family);
+  font-size: 16px;
+  resize: vertical;
+  margin-bottom: var(--spacing-md);
+}
+
+textarea#prompt-text:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.nickname-field {
+  margin-bottom: var(--spacing-md);
+}
+
+.nickname-field label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-size: 14px;
+}
+
+.nickname-field input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family);
+  font-size: 16px;
+}
+
+.nickname-field input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.submit-button {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: var(--spacing-md);
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #3a6bcc;
+}
+
+.submit-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.submit-button.processing {
+  background-color: #a0a0a0;
+  cursor: wait;
+  position: relative;
+}
+
+.prompt-guidelines, .prompt-examples {
+  background-color: var(--surface-color);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.prompt-guidelines h4, .prompt-examples h4 {
+  margin-bottom: var(--spacing-xs);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prompt-guidelines ul, .prompt-examples ul {
+  padding-left: var(--spacing-lg);
+  margin: 0;
+}
+
+.prompt-guidelines li, .prompt-examples li {
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.prompt-examples li {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .prompt-input-container {
+    padding: var(--spacing-sm);
+  }
+  
+  textarea#prompt-text {
+    min-height: 100px;
+  }
+  
+  .prompt-guidelines, .prompt-examples {
+    padding: var(--spacing-sm);
+  }
+}

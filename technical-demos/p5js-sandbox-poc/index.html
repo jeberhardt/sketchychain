@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P5.js Sandbox Isolation - Proof of Concept</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    h1 {
+      border-bottom: 2px solid #0066cc;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .description {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    .controls {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .sandbox-container {
+      flex: 2;
+      min-width: 400px;
+    }
+    
+    .code-editor {
+      width: 100%;
+      height: 300px;
+      font-family: monospace;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    
+    .test-case-select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    
+    .security-status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      background-color: #f8f8f8;
+    }
+    
+    .security-result {
+      margin-top: 5px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    
+    .secure {
+      background-color: #dff0d8;
+      border: 1px solid #d6e9c6;
+      color: #3c763d;
+    }
+    
+    .insecure {
+      background-color: #f2dede;
+      border: 1px solid #ebccd1;
+      color: #a94442;
+    }
+    
+    button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background-color: #0055aa;
+    }
+    
+    button.danger {
+      background-color: #cc4400;
+    }
+    
+    button.danger:hover {
+      background-color: #aa3300;
+    }
+    
+    .tab-container {
+      margin-bottom: 20px;
+    }
+    
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .tab-button {
+      padding: 10px 15px;
+      background-color: #f5f5f5;
+      border: none;
+      border-radius: 4px 4px 0 0;
+      margin-right: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    .tab-button.active {
+      background-color: #0066cc;
+      color: white;
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .warning {
+      padding: 10px;
+      background-color: #fcf8e3;
+      border: 1px solid #faebcc;
+      color: #8a6d3b;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    
+    .optgroup-header {
+      font-weight: bold;
+      font-size: 1.1em;
+      padding: 5px;
+      background-color: #f5f5f5;
+    }
+    
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <h1>P5.js Sandbox Isolation - Proof of Concept</h1>
+  
+  <div class="description">
+    <p>
+      This demo validates our security approach for safely executing user-generated P5.js code.
+      It implements a secure sandbox that prevents potentially malicious code from accessing
+      sensitive browser APIs or executing dangerous operations.
+    </p>
+    <div class="warning">
+      <strong>Note:</strong> This is a proof-of-concept implementation. While it demonstrates the core security 
+      principles, a production implementation would require additional hardening and comprehensive testing 
+      across different browsers and environments.
+    </div>
+  </div>
+  
+  <div class="container">
+    <div class="controls">
+      <h2>Test Controls</h2>
+      
+      <div class="tab-container">
+        <div class="tab-buttons">
+          <button id="tab-test-cases" class="tab-button active">Test Cases</button>
+          <button id="tab-custom-code" class="tab-button">Custom Code</button>
+        </div>
+        
+        <div id="content-test-cases" class="tab-content active">
+          <label for="testCaseSelect">Select a test case:</label>
+          <select id="testCaseSelect" class="test-case-select">
+            <optgroup label="Safe Test Cases" class="optgroup-header">
+              <!-- Safe test cases will be populated here by JavaScript -->
+            </optgroup>
+            <optgroup label="Security Test Cases (Should Fail)" class="optgroup-header">
+              <!-- Malicious test cases will be populated here by JavaScript -->
+            </optgroup>
+          </select>
+          
+          <div id="testCaseDescription" style="margin: 10px 0; font-style: italic;"></div>
+        </div>
+        
+        <div id="content-custom-code" class="tab-content">
+          <p>Write your own P5.js code to test in the sandbox:</p>
+          <textarea id="customCode" class="code-editor">function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(220);
+  fill(255, 0, 0);
+  ellipse(mouseX, mouseY, 50, 50);
+}</textarea>
+        </div>
+      </div>
+      
+      <div class="button-group">
+        <button id="runButton">Run in Sandbox</button>
+        <button id="stopButton" class="danger" disabled>Stop Execution</button>
+        <button id="resetButton">Reset Sandbox</button>
+      </div>
+      
+      <div id="monitorContainer" class="monitor"></div>
+    </div>
+    
+    <div class="sandbox-container">
+      <h2>Sandbox Output</h2>
+      <div id="sandboxContainer" style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;"></div>
+      
+      <div class="security-status">
+        <h3>Security Test Results</h3>
+        <div id="securityResults">
+          <p>Run a test case to see security results.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <footer>
+    <p>Sketchy Chain - P5.js Sandbox Isolation Proof of Concept</p>
+  </footer>
+  
+  <!-- Load scripts -->
+  <script src="sandbox.js"></script>
+  <script src="monitoring.js"></script>
+  <script src="test-cases.js"></script>
+  
+  <script>
+    // Initialize components
+    document.addEventListener('DOMContentLoaded', function() {
+      // Populate test case dropdown
+      const testCaseSelect = document.getElementById('testCaseSelect');
+      const safeOptgroup = testCaseSelect.querySelector('optgroup[label="Safe Test Cases"]');
+      const maliciousOptgroup = testCaseSelect.querySelector('optgroup[label="Security Test Cases (Should Fail)"]');
+      
+      // Add safe test cases
+      for (const key in TEST_CASES.safe) {
+        const option = document.createElement('option');
+        option.value = `safe:${key}`;
+        option.textContent = TEST_CASES.safe[key].name;
+        safeOptgroup.appendChild(option);
+      }
+      
+      // Add malicious test cases
+      for (const key in TEST_CASES.malicious) {
+        const option = document.createElement('option');
+        option.value = `malicious:${key}`;
+        option.textContent = TEST_CASES.malicious[key].name;
+        maliciousOptgroup.appendChild(option);
+      }
+      
+      // Update description when test case changes
+      testCaseSelect.addEventListener('change', function() {
+        updateTestCaseDescription();
+      });
+      
+      // Initialize with first test case description
+      updateTestCaseDescription();
+      
+      // Set up tabs
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const tabId = button.id.replace('tab-', 'content-');
+          
+          // Update active tab button
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          
+          // Show active tab content
+          tabContents.forEach(content => content.classList.remove('active'));
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+      
+      // Initialize SandboxManager
+      const sandboxContainer = document.getElementById('sandboxContainer');
+      const sandbox = new SandboxManager({
+        container: sandboxContainer,
+        width: sandboxContainer.clientWidth,
+        height: sandboxContainer.clientHeight,
+        timeout: 10000,
+        memoryLimit: 50,
+        maxFunctionCalls: 5000,
+        onSuccess: handleSuccess,
+        onError: handleError,
+        onTimeout: handleTimeout,
+        onMemoryLimit: handleMemoryLimit,
+        onFunctionLimit: handleFunctionLimit
+      });
+      
+      // Initialize SandboxMonitor
+      const monitorContainer = document.getElementById('monitorContainer');
+      const monitor = new SandboxMonitor({
+        container: monitorContainer
+      });
+      
+      // Set up button handlers
+      const runButton = document.getElementById('runButton');
+      const stopButton = document.getElementById('stopButton');
+      const resetButton = document.getElementById('resetButton');
+      
+      runButton.addEventListener('click', async function() {
+        try {
+          // Get code to execute
+          const code = getSelectedCode();
+          
+          // Clear security results
+          document.getElementById('securityResults').innerHTML = 
+            '<p>Running test case...</p>';
+          
+          // Disable run button, enable stop button
+          runButton.disabled = true;
+          stopButton.disabled = false;
+          
+          // Reset monitor and start tracking execution
+          monitor.startExecution();
+          
+          // Create sandbox if needed
+          if (!sandbox.sandbox) {
+            await sandbox.createSandbox();
+          }
+          
+          // Execute code
+          await sandbox.executeCode(code);
+        } catch (error) {
+          console.error('Error running code:', error);
+          
+          // Show error in security results
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          `;
+          
+          // Update monitor
+          monitor.markError({ message: error.message, stack: error.stack });
+        } finally {
+          // Re-enable run button, disable stop button
+          runButton.disabled = false;
+          stopButton.disabled = true;
+        }
+      });
+      
+      stopButton.addEventListener('click', function() {
+        sandbox.terminateExecution();
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        document.getElementById('securityResults').innerHTML = `
+          <div class="security-result secure">
+            <strong>Execution terminated by user</strong>
+          </div>
+        `;
+      });
+      
+      resetButton.addEventListener('click', function() {
+        sandbox.terminateSandbox();
+        monitor.reset();
+        
+        document.getElementById('securityResults').innerHTML = `
+          <p>Sandbox reset. Run a test case to see security results.</p>
+        `;
+      });
+      
+      // Functions for handling sandbox events
+      function handleSuccess(result) {
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        monitor.markSuccess(result);
+        
+        // Check if we're running a security test
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue.startsWith('malicious:')) {
+          const key = selectedValue.split(':')[1];
+          
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Security Warning:</strong> Malicious test case "${TEST_CASES.malicious[key].name}" completed successfully. This may indicate a security issue.
+            </div>
+          `;
+        } else {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result secure">
+              <strong>Test Completed:</strong> Executed successfully with ${result.functionCalls} function calls.
+            </div>
+          `;
+        }
+      }
+      
+      function handleError(error) {
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        monitor.markError(error);
+        
+        // Check if we're running a security test (expected to fail)
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue.startsWith('malicious:')) {
+          const key = selectedValue.split(':')[1];
+          
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result secure">
+              <strong>Security Test Passed:</strong> Malicious test case "${TEST_CASES.malicious[key].name}" was properly blocked.
+              <p>Error: ${error.message}</p>
+            </div>
+          `;
+        } else {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          `;
+        }
+      }
+      
+      function handleTimeout(timeoutInfo) {
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        monitor.markTimeout(timeoutInfo);
+        
+        // Check if we're running a security test (expected to fail)
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue.startsWith('malicious:') && selectedValue.includes('infinite-loop')) {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result secure">
+              <strong>Security Test Passed:</strong> Infinite loop was properly terminated after ${timeoutInfo.timeoutMs / 1000} seconds.
+            </div>
+          `;
+        } else {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Timeout:</strong> Execution timed out after ${timeoutInfo.timeoutMs / 1000} seconds.
+            </div>
+          `;
+        }
+      }
+      
+      function handleMemoryLimit(memoryInfo) {
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        monitor.markMemoryLimit(memoryInfo);
+        
+        // Check if we're running a security test (expected to fail)
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue.startsWith('malicious:') && selectedValue.includes('memory-hog')) {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result secure">
+              <strong>Security Test Passed:</strong> Memory limit (${memoryInfo.limitBytes / (1024 * 1024)} MB) was properly enforced.
+            </div>
+          `;
+        } else {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Memory Limit Exceeded:</strong> Execution used more than ${memoryInfo.limitBytes / (1024 * 1024)} MB of memory.
+            </div>
+          `;
+        }
+      }
+      
+      function handleFunctionLimit(functionInfo) {
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        
+        monitor.markFunctionLimit(functionInfo);
+        
+        // Check if we're running a security test (expected to fail)
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue.startsWith('malicious:') && (selectedValue.includes('infinite-loop') || selectedValue.includes('function-limit'))) {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result secure">
+              <strong>Security Test Passed:</strong> Function call limit (${functionInfo.functionCalls} calls) was properly enforced.
+            </div>
+          `;
+        } else {
+          document.getElementById('securityResults').innerHTML = `
+            <div class="security-result insecure">
+              <strong>Function Call Limit Exceeded:</strong> Execution made ${functionInfo.functionCalls} function calls, exceeding the limit.
+            </div>
+          `;
+        }
+      }
+      
+      // Helper function to get the selected code
+      function getSelectedCode() {
+        const activeTabId = document.querySelector('.tab-button.active').id;
+        
+        if (activeTabId === 'tab-test-cases') {
+          const selectedValue = testCaseSelect.value;
+          const [type, key] = selectedValue.split(':');
+          return TEST_CASES[type][key].code;
+        } else {
+          return document.getElementById('customCode').value;
+        }
+      }
+      
+      // Helper function to update the test case description
+      function updateTestCaseDescription() {
+        const selectedValue = testCaseSelect.value;
+        if (selectedValue) {
+          const [type, key] = selectedValue.split(':');
+          const testCase = TEST_CASES[type][key];
+          document.getElementById('testCaseDescription').textContent = testCase.description;
+        } else {
+          document.getElementById('testCaseDescription').textContent = '';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
