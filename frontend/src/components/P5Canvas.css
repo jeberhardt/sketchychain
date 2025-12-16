@@ -41,14 +41,14 @@
   bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.5);
   border-radius: 20px;
   padding: 5px 10px;
   display: flex;
   gap: 10px;
   z-index: 5;
   transition: opacity 0.3s;
-  opacity: 0.6;
+  opacity: 0.6; /* Semi-transparent until hovered */
 }
 
 .canvas-controls:hover {
@@ -77,4 +77,80 @@
   .p5-canvas-container {
     height: 50vh;
   }
+}
+
+/* Theater Mode Styles */
+.sketch-content {
+  display: flex;
+  flex-direction: row;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Move control panel to the left side */
+.sketch-content {
+  flex-direction: row-reverse;
+}
+
+/* Body class to allow full width */
+body.theater-mode-active {
+  overflow-x: hidden;
+}
+
+.sketch-content.theater-mode {
+  flex-direction: row-reverse;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.theater-mode .canvas-area {
+  width: 100% !important;
+  max-width: 100% !important;
+  transition: all 0.3s ease-in-out;
+  margin: 0;
+  padding: 0;
+}
+
+.theater-mode .control-panel {
+  width: 100%;
+  margin-top: 20px;
+  padding: 0 20px;
+}
+
+/* Fullscreen transition animation */
+.canvas-area {
+  transition: width 0.3s ease-in-out, height 0.3s ease-in-out;
+}
+
+/* Make sure the canvas fills the available space */
+.theater-mode .p5-canvas-container {
+  width: 100%;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theater-mode .p5-canvas-container canvas {
+  width: 100% !important;
+  max-width: none !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* Additional styling to ensure the P5 canvas fills its container */
+canvas#defaultCanvas0 {
+  display: block;
+  transition: width 0.3s ease-in-out, height 0.3s ease-in-out;
+}
+
+body.theater-mode-active canvas#defaultCanvas0 {
+  width: 100vw !important;
+  height: calc(100vh - 150px) !important;
+}
+
+/* Make sure the theater button remains visible */
+.theater-mode-button {
+  z-index: 1000 !important;
 }

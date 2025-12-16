@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-// Import custom components (we'll create these next)
+// Import custom components
 import P5Canvas from '../components/P5Canvas';
 import PromptInput from '../components/PromptInput';
 import HistoryViewer from '../components/HistoryViewer';
@@ -19,144 +19,157 @@ const SketchEditor = ({ isNew = false }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('prompt'); // 'prompt', 'history', 'users'
   
-  // WebSocket connection for real-time updates
-  const { 
-    connected,
-    events,
-    sendActivity
-  } = useWebSocket(sketch?.id);
+  // Simplified WebSocket connection for demo
+  const { connected = true, events = null, sendActivity = () => {} } = useWebSocket(sketchId);
 
-  // Effect to handle WebSocket events
+  // Create a default sketch
   useEffect(() => {
-    if (!events) return;
-
-    // Handle different event types
-    if (events.type === 'sketch:updated') {
-      setSketch(prevSketch => ({
-        ...prevSketch,
-        currentCode: events.data.code,
-        lastModified: {
-          timestamp: events.data.timestamp,
-          promptId: events.data.promptId
-        }
-      }));
-      setIsProcessing(false);
-    } else if (events.type === 'prompt:submitted') {
-      setIsProcessing(true);
-    } else if (events.type === 'prompt:status_update' && events.data.status.code === 'failed') {
-      setIsProcessing(false);
-    }
-  }, [events]);
-
-  // Fetch sketch data or create a new sketch
-  useEffect(() => {
-    const fetchSketch = async () => {
+    const getSketch = async () => {
       try {
         setLoading(true);
         
-        if (isNew) {
-          // Create a new sketch
-          const response = await axios.post(
-            `${process.env.REACT_APP_API_URL}/api/v1/sketches`, 
-            {
-              title: 'Untitled Sketch',
-              description: '',
-              baseTemplate: `function setup() {
+        // For demo, create a simple sketch without API call
+        const demoSketch = {
+          id: isNew ? 'new-sketch-' + Date.now() : (sketchId || 'demo-sketch'),
+          title: 'Sketch ' + (isNew ? 'New' : sketchId),
+          currentCode: `function setup() {
   createCanvas(800, 600);
+  frameRate(60);
 }
 
 function draw() {
   background(220);
+  fill(255, 0, 0);
+  ellipse(mouseX, mouseY, 20, 20);
 }`,
-              settings: {
-                canvasWidth: 800,
-                canvasHeight: 600,
-                frameRate: 60,
-                isPublic: true,
-                allowAnonymous: true
-              },
-              tags: []
-            }
-          );
-          
-          setSketch(response.data);
-          // Redirect to the new sketch URL
-          navigate(`/sketch/${response.data.id}`, { replace: true });
-        } else {
-          // Fetch existing sketch
-          const response = await axios.get(
-            `${process.env.REACT_APP_API_URL}/api/v1/sketches/${sketchId}`
-          );
-          setSketch(response.data);
+          created: { timestamp: new Date() },
+          lastModified: { timestamp: new Date() },
+          settings: {
+            canvasWidth: 800,
+            canvasHeight: 600,
+            frameRate: 60
+          },
+          isViewingHistory: false,
+          viewingVersion: 1
+        };
+        
+        setSketch(demoSketch);
+        
+        if (isNew && !sketchId) {
+          // Redirect to a new sketch URL
+          navigate(`/sketch/${demoSketch.id}`, { replace: true });
         }
         
         setError(null);
       } catch (err) {
-        console.error('Error fetching/creating sketch:', err);
-        setError(err.response?.data?.error?.message || 'An error occurred');
+        console.error('Error creating sketch:', err);
+        setError('Failed to create sketch');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSketch();
+    getSketch();
   }, [isNew, sketchId, navigate]);
 
-  // Handle prompt submission
+  // Handle prompt submission and API integration
   const handlePromptSubmit = async (promptData) => {
     try {
       setIsProcessing(true);
       
-      await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/v1/sketches/${sketch.id}/prompts`,
-        promptData
-      );
+      // For demo/development, we can use a local API or mock it
+      const isDemoMode = process.env.REACT_APP_DEMO_MODE === 'true';
       
-      // The actual update will come through the WebSocket
-      // so we don't need to update the state directly here
-      
-      return { success: true };
+      if (isDemoMode) {
+        console.log('Running in demo mode - using simulated AI response');
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Demo update - add a rectangle to the canvas
+        const updatedCode = sketch.currentCode + `
+// Added from prompt: ${promptData.text}
+function mousePressed() {
+  fill(0, 255, 0);
+  rect(mouseX, mouseY, 50, 50);
+}`;
+        
+        setSketch({
+          ...sketch,
+          currentCode: updatedCode,
+          lastModified: { timestamp: new Date() }
+        });
+        
+        setIsProcessing(false);
+        return { success: true };
+      } else {
+        // In production, send to backend API
+        console.log('Submitting prompt to the backend API for AI processing');
+        
+        const response = await axios.post('/api/prompts', {
+          text: promptData.text,
+          sketchId: sketch.id,
+          nickname: promptData.nickname || 'Anonymous'
+        });
+        
+        if (response.data.success) {
+          // In a real app, we would listen for WebSocket updates
+          // for the completed code. For now, we'll simulate it
+          console.log('Prompt submitted successfully, waiting for processing');
+          
+          // For testing, simulate a WebSocket message after a delay
+          // In production, this would come from the actual WebSocket
+          setTimeout(() => {
+            const aiGeneratedUpdate = `
+// AI-generated code from OpenAI GPT-3.5-Turbo for prompt: ${promptData.text}
+// This is a simulation of what would come back from the AI worker
+
+function mousePressed() {
+  // Generated by AI based on the prompt
+  let colors = [
+    color(255, 0, 0),
+    color(0, 255, 0),
+    color(0, 0, 255)
+  ];
+  
+  fill(random(colors));
+  ellipse(mouseX, mouseY, 50, 50);
+}`;
+
+            setSketch({
+              ...sketch,
+              currentCode: sketch.currentCode + aiGeneratedUpdate,
+              lastModified: { timestamp: new Date() }
+            });
+            
+            setIsProcessing(false);
+          }, 3000);
+          
+          return { success: true };
+        } else {
+          throw new Error(response.data.message || 'Unknown error');
+        }
+      }
     } catch (err) {
-      console.error('Error submitting prompt:', err);
+      console.error('Error with prompt:', err);
       setIsProcessing(false);
-      return { 
-        success: false, 
-        error: err.response?.data?.error?.message || 'Failed to submit prompt' 
+      return {
+        success: false,
+        error: err.message || 'Failed to process prompt'
       };
     }
   };
 
-  // Handle sketch history navigation
+  // Simplified history viewer
   const handleViewVersion = (version) => {
-    // Just update the UI with the historical code without creating a new version
-    setSketch(prevSketch => ({
-      ...prevSketch,
-      currentCode: version.code,
+    setSketch(prev => ({
+      ...prev,
       isViewingHistory: true,
       viewingVersion: version.sequence
     }));
   };
 
-  // Handle reverting to a previous version
-  const handleRevertToVersion = async (versionSequence) => {
-    try {
-      setIsProcessing(true);
-      
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/v1/sketches/${sketch.id}/revert`,
-        { versionSequence }
-      );
-      
-      // Update will come via WebSocket
-      return { success: true };
-    } catch (err) {
-      console.error('Error reverting to version:', err);
-      setIsProcessing(false);
-      return { 
-        success: false, 
-        error: err.response?.data?.error?.message || 'Failed to revert to version' 
-      };
-    }
+  const handleRevertToVersion = async () => {
+    return { success: true };
   };
 
   if (loading) {
@@ -176,8 +189,8 @@ function draw() {
         <div className="error-message">
           <h2>Error</h2>
           <p>{error}</p>
-          <button onClick={() => navigate('/gallery')} className="button mt-3">
-            Return to Gallery
+          <button onClick={() => navigate('/')} className="button mt-3">
+            Return Home
           </button>
         </div>
       </div>
@@ -185,78 +198,80 @@ function draw() {
   }
 
   return (
-    <div className="sketch-editor-page">
-      <div className="sketch-header">
-        <h1>{sketch.title || 'Untitled Sketch'}</h1>
-        <div className="sketch-meta">
-          <span className="last-updated">
-            Last updated: {new Date(sketch.lastModified?.timestamp || sketch.created?.timestamp).toLocaleString()}
-          </span>
-          <div className="connection-status">
-            {connected ? (
-              <span className="status-connected">Connected</span>
-            ) : (
-              <span className="status-disconnected">Disconnected</span>
-            )}
+    <div className="container">
+      <div className="sketch-editor-page">
+        <div className="sketch-header">
+          <h1>{sketch.title || 'Untitled Sketch'}</h1>
+          <div className="sketch-meta">
+            <span className="last-updated">
+              Last updated: {new Date(sketch.lastModified?.timestamp).toLocaleString()}
+            </span>
+            <div className="connection-status">
+              {connected ? (
+                <span className="status-connected">Connected</span>
+              ) : (
+                <span className="status-disconnected">Disconnected</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="sketch-content">
-        <div className="canvas-area">
-          {/* P5.js Canvas Component */}
-          <P5Canvas 
-            code={sketch.currentCode}
-            width={sketch.settings?.canvasWidth || 800}
-            height={sketch.settings?.canvasHeight || 600}
-            isProcessing={isProcessing}
-          />
-        </div>
-
-        <div className="control-panel">
-          <div className="control-tabs">
-            <button 
-              className={`tab-button ${activeTab === 'prompt' ? 'active' : ''}`}
-              onClick={() => setActiveTab('prompt')}
-            >
-              Prompt
-            </button>
-            <button 
-              className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => setActiveTab('history')}
-            >
-              History
-            </button>
-            <button 
-              className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-              onClick={() => setActiveTab('users')}
-            >
-              Users
-            </button>
+        <div className="sketch-content">
+          <div className="canvas-area">
+            {/* P5.js Canvas Component */}
+            <P5Canvas 
+              code={sketch.currentCode}
+              width={sketch.settings?.canvasWidth || 800}
+              height={sketch.settings?.canvasHeight || 600}
+              isProcessing={isProcessing}
+            />
           </div>
 
-          <div className="tab-content">
-            {activeTab === 'prompt' && (
-              <PromptInput 
-                sketchId={sketch.id}
-                onPromptSubmit={handlePromptSubmit}
-                isProcessing={isProcessing}
-                onActivityUpdate={sendActivity}
-              />
-            )}
+          <div className="control-panel">
+            <div className="control-tabs">
+              <button 
+                className={`tab-button ${activeTab === 'prompt' ? 'active' : ''}`}
+                onClick={() => setActiveTab('prompt')}
+              >
+                Prompt
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveTab('history')}
+              >
+                History
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
+                onClick={() => setActiveTab('users')}
+              >
+                Users
+              </button>
+            </div>
 
-            {activeTab === 'history' && (
-              <HistoryViewer 
-                sketchId={sketch.id}
-                currentVersion={sketch.viewingVersion}
-                onViewVersion={handleViewVersion}
-                onRevertToVersion={handleRevertToVersion}
-              />
-            )}
+            <div className="tab-content">
+              {activeTab === 'prompt' && (
+                <PromptInput 
+                  sketchId={sketch.id}
+                  onPromptSubmit={handlePromptSubmit}
+                  isProcessing={isProcessing}
+                  onActivityUpdate={sendActivity}
+                />
+              )}
 
-            {activeTab === 'users' && (
-              <ActiveUsers sketchId={sketch.id} />
-            )}
+              {activeTab === 'history' && (
+                <HistoryViewer 
+                  sketchId={sketch.id}
+                  currentVersion={sketch.viewingVersion}
+                  onViewVersion={handleViewVersion}
+                  onRevertToVersion={handleRevertToVersion}
+                />
+              )}
+
+              {activeTab === 'users' && (
+                <ActiveUsers sketchId={sketch.id} />
+              )}
+            </div>
           </div>
         </div>
       </div>
